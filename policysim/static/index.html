@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PolicySim — Econ Village 3D</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #0f221e; font-family: 'Manrope', sans-serif; overflow: hidden; }
+  #scene { position: absolute; inset: 0; }
+
+  #header { position: absolute; top: 22px; left: 0; right: 0; text-align: center; color: #f5efe6; pointer-events: none; }
+  #header .eyebrow { font-size: 11px; letter-spacing: 0.18em; color: #9fb8b0; font-family: 'JetBrains Mono', monospace; }
+  #header h1 { font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 30px; margin-top: 6px; }
+  #header h1 span { color: #e8935b; }
+
+  #hud { position: absolute; top: 20px; left: 20px; background: rgba(15,34,30,0.85); border: 1px solid rgba(255,255,255,0.08);
+         border-radius: 12px; padding: 14px 16px; color: #f5efe6; min-width: 180px; }
+  #hud .round { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #9fb8b0; margin-bottom: 8px; }
+  #hud button { width: 100%; background: #c9a227; border: none; border-radius: 8px; padding: 8px 10px; color: #16241F;
+                font-weight: 700; font-family: 'Baloo 2', sans-serif; cursor: pointer; margin-bottom: 8px; }
+  #hud button.secondary { background: rgba(255,255,255,0.08); color: #f5efe6; }
+  #hud .stats { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #9fb8b0; line-height: 1.7; }
+  #hud .stats b { color: #f5efe6; }
+
+  #drawer { position: absolute; top: 0; right: 0; height: 100%; width: 330px; background: rgba(15,34,30,0.94);
+            backdrop-filter: blur(6px); border-left: 1px solid rgba(255,255,255,0.08); padding: 26px 24px;
+            color: #f5efe6; overflow-y: auto; transform: translateX(100%); transition: transform .25s ease; }
+  #drawer.open { transform: translateX(0); }
+  #drawer .close { position: absolute; top: 16px; right: 18px; background: none; border: none; color: #9fb8b0; font-size: 20px; cursor: pointer; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.15em; color: #9fb8b0; text-transform: uppercase; }
+  .title { font-family: 'Baloo 2', sans-serif; font-size: 24px; margin: 8px 0 18px; }
+  .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 13.5px; }
+  .stat-row span:first-child { color: #9fb8b0; }
+  .stat-row span:last-child { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .note { margin-top: 16px; font-size: 11.5px; color: #9fb8b0; font-family: 'JetBrains Mono', monospace; line-height: 1.5;
+          border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 14px; }
+  .policy-btn { display: block; width: 100%; text-align: left; margin-bottom: 10px; border-radius: 10px; padding: 10px 12px;
+                cursor: pointer; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); color: #f5efe6; }
+  .policy-btn .label { font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 13.5px; }
+  .policy-btn .desc { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+
+  #footer { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 11px; color: #9fb8b0;
+            font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="scene"></div>
+
+<div id="header">
+  <div class="eyebrow">POLICYSIM · LIVE PYTHON ENGINE</div>
+  <h1>Econ Village <span>3D</span></h1>
+</div>
+
+<div id="hud">
+  <div class="round" id="round-label">ROUND 0</div>
+  <button id="step-btn">Step round →</button>
+  <button id="reset-btn" class="secondary">Restart simulation</button>
+  <div class="stats" id="stats-box"></div>
+</div>
+
+<div id="drawer">
+  <button class="close" id="drawer-close">✕</button>
+  <div id="drawer-content"></div>
+</div>
+
+<div id="footer">drag to orbit · scroll to zoom · click a building</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const TIER_WALL = { low: 0xf3d9b6, mid: 0xfbefe1, high: 0xece4d6 };
+const TIER_ROOF = { low: 0xe8935b, mid: 0xf2b880, high: 0xd9a441 };
+
+const POLICY_COLOR = {
+  subsidy_cut: '#e8604c',
+  minimum_wage_increase: '#c9a227',
+  luxury_tax: '#4c72a8',
+  cash_transfer: '#6fae7a',
+};
+
+let scene, camera, renderer, controls, raycaster, mouse;
+let clickable = [];
+let houseRefs = {}, firmRefs = {};
+let currentState = null;
+let selected = null; // { type, id }
+
+function initScene() {
+  const mount = document.getElementById('scene');
+  const width = mount.clientWidth, height = mount.clientHeight;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0f221e);
+  scene.fog = new THREE.FogExp2(0x16302b, 0.017);
+
+  camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
+  camera.position.set(15, 19, 23);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  mount.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 1, -3);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 12;
+  controls.maxDistance = 42;
+  controls.maxPolarAngle = Math.PI * 0.48;
+  controls.update();
+
+  scene.add(new THREE.AmbientLight(0x8fb8b0, 0.6));
+
+  const key = new THREE.DirectionalLight(0xffe3b0, 1.15);
+  key.position.set(24, 32, 16);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.camera.left = -30; key.shadow.camera.right = 30;
+  key.shadow.camera.top = 30; key.shadow.camera.bottom = -30;
+  scene.add(key);
+
+  const rim = new THREE.PointLight(0xe86a4c, 0.5, 60);
+  rim.position.set(-14, 8, -14);
+  scene.add(rim);
+
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(48, 64),
+    new THREE.MeshStandardMaterial({ color: 0x1d3a34, roughness: 1 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const plaza = new THREE.Mesh(
+    new THREE.RingGeometry(9.5, 10.3, 48),
+    new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.7 })
+  );
+  plaza.rotation.x = -Math.PI / 2;
+  plaza.position.set(0, 0.01, -6);
+  scene.add(plaza);
+
+  makeGov(0, -12);
+
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+
+  let downX = 0, downY = 0;
+  renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; });
+  renderer.domElement.addEventListener('pointerup', (e) => {
+    if (Math.abs(e.clientX - downX) > 4 || Math.abs(e.clientY - downY) > 4) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(clickable);
+    if (hits.length > 0) openDrawer(hits[0].object.userData);
+  });
+
+  window.addEventListener('resize', () => {
+    const w = mount.clientWidth, h = mount.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
+
+  animate();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function tag(mesh, data) { mesh.userData = data; clickable.push(mesh); }
+
+function makeHouse(x, z, hh) {
+  const group = new THREE.Group();
+  const wallMat = new THREE.MeshStandardMaterial({ color: TIER_WALL[hh.tier] || 0xfbefe1, roughness: 0.85 });
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.6, 2.1), wallMat);
+  wall.position.y = 0.8; wall.castShadow = true; wall.receiveShadow = true;
+  group.add(wall);
+
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(1.65, 1.05, 4),
+    new THREE.MeshStandardMaterial({ color: TIER_ROOF[hh.tier] || 0xf2b880, roughness: 0.55 })
+  );
+  roof.rotation.y = Math.PI / 4; roof.position.y = 1.6 + 0.5; roof.castShadow = true;
+  group.add(roof);
+
+  const winMat = new THREE.MeshStandardMaterial({ color: 0xffe9b0, emissive: 0xffcf7a, emissiveIntensity: hh.employed ? 0.85 : 0.15 });
+  const win = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.05), winMat);
+  win.position.set(0, 0.9, 1.08);
+  group.add(win);
+
+  group.position.set(x, 0, z);
+  const data = { type: 'household', id: hh.id };
+  tag(wall, data); tag(roof, data); tag(win, data);
+  scene.add(group);
+  houseRefs[hh.id] = { group, wallMat, winMat };
+}
+
+function makeFirm(x, z, firm, isFirst) {
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: isFirst ? 0x4c848a : 0x386065, roughness: 0.6 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.8, 3), bodyMat);
+  body.position.y = 1.4; body.castShadow = true; body.receiveShadow = true;
+  group.add(body);
+
+  const chimneyMat = new THREE.MeshStandardMaterial({ color: 0x2c4c50, emissive: 0xe8935b, emissiveIntensity: 0 });
+  const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 1.9, 12), chimneyMat);
+  chimney.position.set(1.2, 3.7, 0.7); chimney.castShadow = true;
+  group.add(chimney);
+
+  group.position.set(x, 0, z);
+  const data = { type: 'firm', id: firm.id };
+  tag(body, data); tag(chimney, data);
+  scene.add(group);
+  firmRefs[firm.id] = { group, bodyMat, chimneyMat };
+}
+
+function makeGov(x, z) {
+  const group = new THREE.Group();
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(6, 2.2, 3.8),
+    new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.45, metalness: 0.2 })
+  );
+  base.position.y = 1.1; base.castShadow = true; base.receiveShadow = true;
+  group.add(base);
+  const data = { type: 'gov', id: 'gov' };
+  tag(base, data);
+
+  for (let i = -2; i <= 2; i += 1.6) {
+    if (Math.abs(i) < 0.3) continue;
+    const col = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17, 0.17, 2.1, 12),
+      new THREE.MeshStandardMaterial({ color: 0xf5efe6 })
+    );
+    col.position.set(i, 1.05, 1.95); col.castShadow = true;
+    tag(col, data);
+    group.add(col);
+  }
+
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(4.4, 1.5, 4),
+    new THREE.MeshStandardMaterial({ color: 0x9c7e1d, roughness: 0.5 })
+  );
+  roof.rotation.y = Math.PI / 4; roof.position.y = 2.2 + 0.75; roof.castShadow = true;
+  tag(roof, data);
+  group.add(roof);
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+}
+
+function clearVillage() {
+  Object.values(houseRefs).forEach((r) => scene.remove(r.group));
+  Object.values(firmRefs).forEach((r) => scene.remove(r.group));
+  houseRefs = {}; firmRefs = {};
+  clickable = clickable.filter((m) => m.userData.type === 'gov');
+}
+
+function rebuildVillage(state) {
+  clearVillage();
+  state.households.forEach((hh, i) => {
+    const r = Math.floor(i / 5), c = i % 5;
+    makeHouse((c - 2) * 4.1, 4 + r * 4.4, hh);
+  });
+  state.firms.forEach((f, i) => makeFirm(i === 0 ? -7.5 : 7.5, -3.5, f, i === 0));
+}
+
+function updateVillageMaterials(state) {
+  state.households.forEach((hh) => {
+    const ref = houseRefs[hh.id];
+    if (ref) ref.winMat.emissiveIntensity = hh.employed ? 0.85 : 0.15;
+  });
+  state.firms.forEach((f) => {
+    const ref = firmRefs[f.id];
+    if (ref) {
+      const capacity = Math.max(f.employees, 1) * (f.capacity_per_employee || 20);
+      const utilization = capacity ? f.last_demand / capacity : 0.5;
+      const heat = Math.min(Math.max((utilization - 0.6) / 0.8, 0), 1);
+      ref.chimneyMat.emissiveIntensity = heat * 0.6;
+    }
+  });
+}
+
+/* ---------------- API + state ---------------- */
+
+async function fetchState() {
+  const res = await fetch('/api/state');
+  return res.json();
+}
+async function stepRound() {
+  const res = await fetch('/api/step', { method: 'POST' });
+  return res.json();
+}
+async function resetSim() {
+  const res = await fetch('/api/reset', { method: 'POST' });
+  return res.json();
+}
+async function togglePolicy(id) {
+  const res = await fetch(`/api/policy/${id}`, { method: 'POST' });
+  return res.json();
+}
+
+function applyState(state, rebuildIfNeeded = false) {
+  const prevHouseCount = Object.keys(houseRefs).length;
+  const prevFirmCount = Object.keys(firmRefs).length;
+  if (rebuildIfNeeded && (prevHouseCount !== state.households.length || prevFirmCount !== state.firms.length)) {
+    rebuildVillage(state);
+  } else if (prevHouseCount === 0) {
+    rebuildVillage(state);
+  }
+  updateVillageMaterials(state);
+  currentState = state;
+  updateHUD();
+  if (selected) renderDrawer();
+}
+
+function updateHUD() {
+  document.getElementById('round-label').textContent = `ROUND ${currentState.round}`;
+  const latest = currentState.latest_stats;
+  const box = document.getElementById('stats-box');
+  if (latest) {
+    box.innerHTML = `
+      <div>price idx <b>${latest.price_level.toFixed(2)}</b></div>
+      <div>unemployment <b>${(latest.unemployment_rate * 100).toFixed(0)}%</b></div>
+      <div>wealth gini <b>${latest.gini.toFixed(2)}</b></div>
+    `;
+  } else {
+    box.innerHTML = `<div>step a round to see stats</div>`;
+  }
+}
+
+function openDrawer(data) {
+  selected = data;
+  document.getElementById('drawer').classList.add('open');
+  renderDrawer();
+}
+function closeDrawer() {
+  selected = null;
+  document.getElementById('drawer').classList.remove('open');
+}
+
+function renderDrawer() {
+  const el = document.getElementById('drawer-content');
+  if (!selected || !currentState) return;
+
+  if (selected.type === 'household') {
+    const hh = currentState.households.find((h) => h.id === selected.id);
+    el.innerHTML = `
+      <div class="eyebrow">Household · ${hh.tier} income</div>
+      <div class="title">H-${String(hh.id).padStart(2, '0')}</div>
+      ${statRow('Employed', hh.employed ? 'Yes' : 'No')}
+      ${statRow('Disposable income', `₹${(hh.last_income || hh.base_income).toFixed(0)}`)}
+      ${statRow('Last round spend', `₹${hh.last_spend.toFixed(0)}`)}
+      ${statRow('Savings', `₹${hh.savings.toFixed(0)}`)}
+      <div class="note">${hh.last_reasoning || "Hasn't reasoned yet — step a round to see this household's thinking."}</div>
+    `;
+  } else if (selected.type === 'firm') {
+    const firm = currentState.firms.find((f) => f.id === selected.id);
+    el.innerHTML = `
+      <div class="eyebrow">${firm.kind === 'small_shop' ? 'Firm · small shop' : 'Firm · large firm'}</div>
+      <div class="title">${firm.name}</div>
+      ${statRow('Price', `₹${firm.price.toFixed(2)}`)}
+      ${statRow('Wage', `₹${firm.wage.toFixed(2)}/round`)}
+      ${statRow('Employees', `${firm.employees} / ${firm.max_employees}`)}
+      ${statRow('Last demand', firm.last_demand.toFixed(1))}
+      ${statRow('Last revenue', `₹${firm.last_revenue.toFixed(0)}`)}
+      <div class="note">${firm.last_reasoning || "Hasn't reasoned yet — step a round to see this firm's thinking."}</div>
+    `;
+  } else {
+    const gov = currentState.government;
+    const policies = Object.entries(currentState.policy_library)
+      .map(([id, spec]) => {
+        const active = !!gov.active_policies[id];
+        const color = POLICY_COLOR[id] || '#9fb8b0';
+        return `
+          <button class="policy-btn" data-policy="${id}" style="background:${active ? color : 'rgba(255,255,255,0.05)'}; border-color:${active ? color : 'rgba(255,255,255,0.12)'}; color:${active ? '#16241F' : '#f5efe6'};">
+            <div class="label">${spec.label}</div>
+            <div class="desc">${spec.description}</div>
+          </button>
+        `;
+      })
+      .join('');
+    el.innerHTML = `
+      <div class="eyebrow">Policymaker</div>
+      <div class="title">Town Hall</div>
+      ${statRow('Tax rate', `${(gov.tax_rate * 100).toFixed(0)}%`)}
+      ${statRow('Minimum wage', `₹${gov.minimum_wage.toFixed(2)}`)}
+      ${statRow('Firm subsidy rate', `${(gov.firm_subsidy_rate * 100).toFixed(1)}%`)}
+      ${statRow('Cash transfer (low/mid)', `₹${gov.cash_transfer_low.toFixed(0)} / ₹${gov.cash_transfer_mid.toFixed(0)}`)}
+      <div style="margin-top:18px; font-size:12px; color:#9fb8b0; margin-bottom:10px;">
+        Toggle a policy shock — showing the same one twice reverts it, same as the original color-card demo.
+      </div>
+      ${policies}
+      <div class="note">Live from the real PolicySim Python engine — this is the actual heuristic reasoning, not a mock.</div>
+    `;
+    el.querySelectorAll('.policy-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const state = await togglePolicy(btn.dataset.policy);
+        applyState(state);
+      });
+    });
+  }
+}
+
+function statRow(label, value) {
+  return `<div class="stat-row"><span>${label}</span><span>${value}</span></div>`;
+}
+
+/* ---------------- wiring ---------------- */
+
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+document.getElementById('step-btn').addEventListener('click', async () => {
+  const state = await stepRound();
+  applyState(state);
+});
+document.getElementById('reset-btn').addEventListener('click', async () => {
+  const state = await resetSim();
+  applyState(state, true);
+});
+
+initScene();
+fetchState().then((state) => applyState(state, true));
+</script>
+</body>
+</html>
