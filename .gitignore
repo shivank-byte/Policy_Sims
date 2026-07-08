@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local scratch outputs (regenerate via experiments/generate_charts.py + build_report.py)
+# Uncomment if you'd rather regenerate these than commit binary artifacts:
+# assets/charts/*.png
+# policysim_results_report.pdf
+
+# Camera calibration output (machine-specific, from calibrate_camera.py)
+assets/calibrated_hsv_ranges.json
