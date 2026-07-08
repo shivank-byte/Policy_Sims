@@ -1,9 +1,7 @@
 # PolicySim
 ### Generative Agent-Based Economic Simulation with Live Policy Triggers
 
-[![tests](https://github.com/USERNAME/policysim/actions/workflows/tests.yml/badge.svg)](https://github.com/USERNAME/policysim/actions/workflows/tests.yml)
-
-> Replace `USERNAME` above with your GitHub username/org once this is pushed to a repo — the badge is wired to `.github/workflows/tests.yml`, which runs the 52-test regression suite on every push/PR.
+[![tests](https://github.com/shivank-byte/policysim/actions/workflows/tests.yml/badge.svg)](https://github.com/shivank-byte/policysim/actions/workflows/tests.yml)
 
 
 A miniature economy run by AI agents — households, firms, and a government —
