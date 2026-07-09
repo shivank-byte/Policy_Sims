@@ -1,50 +1,43 @@
 # Core (required)
-# Pinned to specific versions this project was tested against (rather than
-# open-ended >= ranges) so a fresh install reproduces the same behavior --
-# especially important for the statistical experiments in experiments/,
-# where a different numpy/scipy minor version could shift RNG behavior.
-numpy==1.26.4
-pandas==2.2.2
-# headless, not the full GUI build: this app only ever calls cv2's pure
-# array/image-processing functions (cvtColor, inRange, findContours...),
-# never cv2.imshow/namedWindow -- the full opencv-python package needs
-# system GUI libraries (libGL, libglib2.0, etc.) that cloud containers
-# don't ship by default and that have been unreliable to apt-get install
-# on Streamlit Cloud (broken dependency chains on their current base
-# image). Headless sidesteps that whole problem class since it doesn't
-# link against those libraries at all, and needs zero packages.txt entries.
-#
-# LOCAL USE ONLY: calibrate_camera.py and trigger_system.py's continuous
-# local-webcam loop DO call cv2.imshow/cv2.waitKey and need the real GUI
-# build. If you want to run those locally: `pip uninstall opencv-python-
-# headless && pip install opencv-python` in your own venv (don't do this
-# in the deployed app's requirements.txt, or Streamlit Cloud breaks again).
-opencv-python-headless==4.9.0.80
-streamlit==1.32.2
-matplotlib==3.8.4
-requests==2.31.0
-Pillow==10.3.0
+# NOTE: previously pinned to exact versions (==) for reproducibility, but
+# that backfired hard on Streamlit Cloud: their platform is currently
+# forcing Python 3.14 regardless of runtime.txt (a confirmed, open
+# platform bug as of mid-2026 -- see README §0.1), and several of the old
+# exact pins here predate Python 3.14's existence, so no matching wheel
+# exists for them, forcing slow/broken from-source builds during deploy.
+# Switched to minimum-version floors (>=) instead, so pip/uv resolves to
+# whatever current release actually has a 3.14 wheel. Every floor below
+# has been directly verified working against this project's own test
+# suite on newer versions (numpy 2.4.4, pandas 3.0.2, scipy 1.17.1,
+# Pillow 12.1.1, opencv 4.13.0) -- not a guess, actually run.
+numpy>=1.26
+pandas>=2.2
+opencv-python-headless>=4.9
+streamlit>=1.50
+matplotlib>=3.8
+requests>=2.31
+Pillow>=10.3
 
 # 3D web dashboard (server.py) — serves the live simulation over HTTP to
 # the Three.js front-end in policysim/static/
-fastapi==0.110.1
-uvicorn==0.29.0
+fastapi>=0.110
+uvicorn>=0.29
 
 # Statistical experiments (experiments/)
-scipy==1.13.0
+scipy>=1.13
 
 # Optional: only needed if you want to print physical QR trigger cards
-qrcode[pil]==7.4.2
+qrcode[pil]>=7.4
 
 # Optional: only needed for the "groq" reasoning backend (hosted, needs internet)
 # no extra package beyond `requests`, already listed above
 
 # Dev/testing only: needed to run the regression suite in tests/
-pytest==7.4.4
+pytest>=7.4
 
 # Report generation (build_report.py) — optional, only needed to regenerate
 # the PDF results report
-reportlab==4.4.1
+reportlab>=4.4
 
 # Note on the "ollama" reasoning backend:
 # Ollama itself is not a pip package. Install it separately from https://ollama.com,
